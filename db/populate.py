@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
+from fileinput import filename
 import gzip
 import json
 import requests
+
+from elasticsearch import Elasticsearch
 
 from datetime import datetime
 
@@ -45,26 +48,73 @@ with open('ldap_tree') as ldap:
                 # print('Added '+gh_id+': ')
                 # print(gh_users[gh_id])
 
-            # Reinitialize vars for next user entry    
+            # Reinitialize vars for next user entry
             uid = gh_id = rh_rnd_comp = rh_project = manager_uid = str()
 
-# for year in range(2015, 2022):
-#     for month in range(1,12):
-#         for day in range(1,31):
-#             for hour in range(0,23):
 
-#                 file_name = '{}-{:02d}-{:02d}-{}.json.gz'.format(year, month, day, hour)
-#                 dl_url = 'https://data.gharchive.org/'+file_name
+# Create the ES client instance
+es = Elasticsearch("http://localhost:9200")
 
-#                 print('Downloading '+dl_url)
-#                 dl_file = requests.get(dl_url, stream=True,headers={'User-agent': 'Mozilla/5.0'})
-#                 open(file_name, 'wb').write(dl_file.content)
+# doc = {
+#     'author': 'author_name',
+#     'text': 'Interensting content...',
+#     'timestamp': datetime.now(),
+# }
+# resp = es.index(index="test-index", id=1, document=demailoc)
+# print(resp['result'])
 
-#                 with gzip.open(file_name, 'rb') as archive:
-#                     lines = archive.readlines()
+event_types = [
+    'PushEvent',
+    'IssueCommentEvent',
+    'IssuesEvent',
+    'PullRequestReviewCommentEvent',
+    'PullRequestEvent']
 
-#                     for line_json in lines:
-#                         event = json.loads(line_json)
-#                         if event['type'] == 'PushEvent' and event['actor']['login'] in gh_users:
-#                             print("Found Red Hat user "+event['actor']['login'])
-#                             # print(event['payload'])
+matched = 0
+unmatched = 0
+
+for year in range(2015, 2016):
+    for month in range(1,2):
+
+        es_index = "rh-events-{}-{}".format(year, month)
+        es_id = 0
+
+        for day in range(1,5):
+            for hour in range(0,24):
+
+                file_name = '../gharchive/{}-{:02d}-{:02d}-{}.json.gz'.format(year, month, day, hour)
+                print('Processing {}'.format(file_name))
+
+                ## Download from GH Archive
+                # dl_url = 'https://data.gharchive.org/'+file_name
+
+                # print('Downloading '+dl_url)
+                # dl_file = requests.get(dl_url, stream=True,headers={'User-agent': 'Mozilla/5.0'})
+                # open(file_name, 'wb').write(dl_file.content)
+
+                with gzip.open(file_name, 'rb') as archive:
+                    lines = archive.readlines()
+
+                    for line_json in lines:
+                        event = json.loads(line_json)
+                        if event['type'] in event_types:
+                            if event['actor']['login'] in gh_users:
+                                # print('Found matched Red Hat user '+event['actor']['login'])
+
+                                resp = es.index(index=es_index, id=es_id, document=event)
+                                # print(resp['result'])
+
+                                matched = matched+1
+                                es_id = es_id+1
+                                continue;
+                            if event['type'] == 'PushEvent':
+                                for commit in event['payload']['commits']:
+                                    if '@redhat.com' in commit['author']['email']:
+                                        # print('Found UNmatched Red Hat user '+event['actor']['login']+' '+commit['author']['email'])
+                                        resp = es.index(index=es_index, id=es_id, document=event)
+
+                                        unmatched = unmatched+1
+                                        es_id = es_id+1
+                                        break;
+
+print('Found {} matched and {} unmatched records'.format(matched, unmatched))
