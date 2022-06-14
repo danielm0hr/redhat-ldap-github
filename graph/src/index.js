@@ -3,7 +3,26 @@ import ReactDOM from "react-dom";
 import ForceGraph2D from "react-force-graph-2d";
 // import "./styles.css";
 
-var myArray = ["ba", "be", "bu"];
+
+const { Client } = require('@elastic/elasticsearch')
+const client = new Client({
+  node: 'http://localhost:9200'
+})
+
+const result = await client.search({
+  index: 'rh-events*',
+  query: {
+    match: {
+      quote: 'winter'
+    }
+  }
+})
+
+console.log(result.hits.hits)
+
+
+
+var myArray = ["ba", "bi", "bu"];
 
 function App() {
   let myData = {
