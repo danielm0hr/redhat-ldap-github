@@ -65,7 +65,11 @@ event_types = [
     'PullRequestReviewCommentEvent',
     'PullRequestEvent']
 
-
+# Start at this date
+start_year=2015
+start_month=9
+start_day=8
+start_hour=12
 
 for year in range(2015, 2023):
 
@@ -78,6 +82,18 @@ for year in range(2015, 2023):
             unmatched = 0
 
             for hour in range(0,24):
+
+                if year<start_year:
+                    continue;
+                else:
+                    if year==start_year and month<9:
+                            continue;
+                    else:
+                        if month==9 and day<8:
+                            continue;
+                        else:
+                            if day==8 and hour<12:
+                                continue;
 
                 file_name = '{}-{:02d}-{:02d}-{}.json.gz'.format(year, month, day, hour)
                 print('Processing {}'.format(file_name))
@@ -117,17 +133,17 @@ for year in range(2015, 2023):
 
                                             unmatched = unmatched+1
                                             break;
-                    
+
                     os.remove(file_name)
                 except Exception as e:
                     print(e)
                     print('Skipping {}'.format(file_name))
-                    
+
                     with open('download_errors', 'a') as errors:
                         errors.write('{}: {} failed.'.format(datetime.now(), file_name))
 
 
             print('Found {} matched and {} unmatched records'.format(matched, unmatched))
 
-                
+
 
